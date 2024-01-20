@@ -54,7 +54,13 @@ p > strong {
 
 @media (min-width: 768px) {
   .nextra-sidebar-container {
+    --nextra-menu-height: 1.75rem;
     width: 10rem;
+  }
+
+  .nextra-sidebar-container .nx-sticky:has(button[title="Change theme"]) {
+    padding-top: 0;
+    padding-bottom: 0;
   }
 }
 
