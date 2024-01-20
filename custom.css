@@ -52,6 +52,12 @@ p > strong {
  color: #FF42A1;
 }
 
+@media (min-width: 768px) {
+  .nextra-sidebar-container {
+    width: 10rem;
+  }
+}
+
 .nextra-sidebar-menu {
   box-shadow: none !important;
 }
