@@ -1,36 +1,38 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { IconDownArrow } from './Icons';
 
 const PortalSwitcher = ({ children, ...props }) => {
-	const [isChangePortalShowing, setIsChangePortalShowing] = useState(false);
+	const [{isMenuShowing, toggleButtonRef}, { toggleIsMenuShowing, handleEscapeKey: handleEscapeKey }] = useMenu();
 	return (
 		<div className={'portal-switcher'} {...props}>
-			<div onMouseEnter={() => setIsChangePortalShowing(true)} onMouseLeave={() => setIsChangePortalShowing(false)}>
+			<div onMouseEnter={toggleIsMenuShowing} onMouseLeave={toggleIsMenuShowing}>
 				<div className="logo-row">
-					<a href="/account/agents">
-						<img
-							className="logo"
-							src="https://res.cloudinary.com/dsrqk3ngz/image/upload/v1702580644/insurance-agency-meta_ujrtfn.png"
-							width={75}
-						/>
-					</a>
+					<img
+						className="logo"
+						src="https://res.cloudinary.com/dsrqk3ngz/image/upload/v1702580644/insurance-agency-meta_ujrtfn.png"
+						width={75}
+						alt="Company Logo"
+					/>
 					<div className="text-col">
-						<div onClick={() => (window.location.href = '/account-agents')}>Insurance Agent Portal</div>
+						<a href="/account/agents">Insurance Agent Portal</a>
 
-						<div className="change-portal-text" data-testid="change-portal-trigger">
+						<button
+							ref={toggleButtonRef}
+							className="change-portal-text focus-visible:ring-2"
+							aria-expanded={isMenuShowing}
+							onClick={toggleIsMenuShowing}
+							onKeyDown={handleEscapeKey}
+							data-testid="change-portal-trigger">
 							Change Portal
 							<IconDownArrow />
-						</div>
+						</button>
 					</div>
 				</div>
-				{isChangePortalShowing && (
-					<div className="inner-portals">
-						<div
-							onClick={() => (window.location.href = '/account/brokers/')}
-							className="broker-link"
-							data-testid="broker-portal-link">
+				{isMenuShowing && (
+					<div className="inner-portals" onKeyDown={handleEscapeKey}>
+						<a href="/account/brokers/" className="broker-link" data-testid="broker-portal-link">
 							Broker Portal
-						</div>
+						</a>
 					</div>
 				)}
 			</div>
@@ -39,3 +41,20 @@ const PortalSwitcher = ({ children, ...props }) => {
 };
 
 export default PortalSwitcher;
+
+function useMenu(toggleButtonRef) {
+	const defaultRef = useRef(null);
+	const ref = toggleButtonRef ?? defaultRef;
+	const [isMenuShowing, setIsMenuShowing] = useState(false);
+	const toggleMenuDisplay = useCallback(() => setIsMenuShowing((prev) => !prev), []);
+	const escapeHandler = useCallback((event) => {
+		if (event.code === "Escape") {
+			setIsMenuShowing(false);
+			if (ref.current) {
+				ref.current.focus();
+			}
+		}
+	}, [ref])
+
+	return [{isMenuShowing, toggleButtonRef: ref}, { toggleIsMenuShowing: toggleMenuDisplay, handleEscapeKey: escapeHandler }];
+}
