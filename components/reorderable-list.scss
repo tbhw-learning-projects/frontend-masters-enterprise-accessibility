@@ -50,13 +50,14 @@
         width: 100%;
       }
 
+      
       &.dropArea {
         position: relative;
         
         .text {
           background: #ccc;
         }
-    
+        
         &::before {
           content: "Drop Here";
           color: blue;
@@ -98,5 +99,17 @@
           display: none;
         }
       }
+      
+      button.edit:focus-visible {
+        outline: none;
+        box-shadow: none;
+      }
+      &:has(button.edit:focus) {
+        outline:auto;
+      }
+      &:has(button.edit:focus) span.icon-sort {
+        background-color: #fff;
+      }
     }
   }
+  

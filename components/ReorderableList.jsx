@@ -1,5 +1,9 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import * as ReactAriaLiveAnnouncer from '@react-aria/live-announcer';
+
+function announce(message) {
+	return ReactAriaLiveAnnouncer.announce(message, 'assertive');
+}
 
 const itemData = ['Paddle Boards', 'Bikes', 'Skis'];
 
@@ -11,23 +15,35 @@ const ReorderableListItem = React.forwardRef(function ReorderableListItem({ name
 			onDragStart={props.onDragStart}
 			onDragOver={props.onDragOver}
 			onDrop={props.onDrop}
-			className={props.isReordering && props.isReordering.draggedTo === Number(index) ? 'dropArea' : ''}>
+			onKeyDown={(e) => callbackFn(e, index)}
+			className={
+				props.reorderMetadata.isDragging && props.reorderMetadata.draggedTo === Number(index) ? 'dropArea' : ''
+			}>
 			<span className="text">{name}</span>
-			<span className="icon-sort"></span>
+
+			<button ref={ref} aria-label={`Reorder ${name} from position ${index}`} className="edit">
+				<span className="icon-sort"></span>
+			</button>
 		</li>
 	);
 });
 
 const ReorderableList = () => {
+	const listRef = React.useRef(null);
+	const buttonRef = React.useRef(null);
 	const [items, setItems] = React.useState(itemData);
 
 	const [isReordering, setIsReordering] = React.useState(false);
+	const [reorderMetadata, setReorderMetadata] = React.useState({});
 
+	const toggleIsReordering = useCallback(() => {
+		setIsReordering((prev) => !prev);
+	}, []);
 	const onDragStart = (event) => {
 		const initialPosition = Number(event.currentTarget.dataset.position);
 
-		setIsReordering({
-			...isReordering,
+		setReorderMetadata({
+			...reorderMetadata,
 			draggedFrom: initialPosition,
 			isDragging: true,
 			originalOrder: items,
@@ -39,68 +55,98 @@ const ReorderableList = () => {
 	const onDragOver = (event) => {
 		event.preventDefault();
 
-		let newList = isReordering.originalOrder;
-		const draggedFrom = isReordering.draggedFrom;
+		let newList = reorderMetadata.originalOrder;
+		const draggedFrom = reorderMetadata.draggedFrom;
 		const draggedTo = Number(event.currentTarget.dataset.position);
 		const itemDragged = newList[draggedFrom];
 		const remainingItems = newList.filter((item, index) => index !== draggedFrom);
 
 		newList = [...remainingItems.slice(0, draggedTo), itemDragged, ...remainingItems.slice(draggedTo)];
 
-		if (draggedTo !== isReordering.draggedTo) {
-			setIsReordering({
-				...isReordering,
+		if (draggedTo !== reorderMetadata.draggedTo) {
+			setReorderMetadata({
+				...reorderMetadata,
 				updatedOrder: newList,
 				draggedTo: draggedTo,
 			});
 		}
 	};
 	const onDrop = () => {
-		setItems(isReordering.updatedOrder);
-		setIsReordering({
-			...isReordering,
+		setItems(reorderMetadata.updatedOrder);
+		setReorderMetadata({
+			...reorderMetadata,
 			draggedFrom: null,
 			draggedTo: null,
 			isDragging: false,
 		});
 	};
 	const itemCallbackFn = (event, itemIndex) => {
-		let messageRead = false;
+		let nextIndex = null;
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			if (itemIndex < items.length - 1) {
+				nextIndex = itemIndex + 1;
+			}
+		}
+		if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			if (itemIndex > 0) {
+				nextIndex = itemIndex - 1;
+			}
+		}
 
-		// if (event.key === 'ArrowDown') {
-		//   if (itemIndex < items.length) {
-		// 	let nextIndex = itemIndex + 1
-		// 	let tmpArray = items.slice()
-		// 	tmpArray.splice(nextIndex, 0, tmpArray.splice(itemIndex, 1).pop())
-		// 	setItems(tmpArray)
-		// 	announce(`${tmpArray[nextIndex]} moved to position ${nextIndex + 1}`)
+		if (nextIndex !== null) {
+			let tmpArray = items.slice();
+			tmpArray.splice(nextIndex, 0, tmpArray.splice(itemIndex, 1).pop());
+			setItems(tmpArray);
+			setReorderMetadata((metadata) => ({ ...metadata, draggedFrom: itemIndex, draggedTo: nextIndex }));
+			announce(`${tmpArray[nextIndex]} moved to position ${nextIndex + 1}`);
+		}
 
-		// 	listButtonRefs.current[nextIndex].focus()
-		//   }
-		// } else if (event.key === 'ArrowUp') {
-		//   if (itemIndex > 0) {
-		// 	let prevIndex = itemIndex - 1
-		// 	let tmpArray = items.slice()
-		// 	tmpArray.splice(prevIndex, 0, tmpArray.splice(itemIndex, 1).pop())
-		// 	setItems(tmpArray)
-		// 	announce(`${tmpArray[prevIndex]} moved to position ${prevIndex + 1}`)
-
-		// 	listButtonRefs.current[prevIndex].focus()
-		//   }
-		// }
+		
+		// focus locking
+		if (event.key === 'Escape') {
+			buttonRef.current.click();
+		}
+		if (event.key === 'Tab') {
+			if (itemIndex === 0 && event.shiftKey && [event.ctrlKey, event.metaKey, event.altKey].every((value) => !value)) {
+				event.preventDefault();
+				listRef.current.children[items.length - 1].querySelector('button.edit').focus();
+			} else if (
+				itemIndex === items.length - 1 &&
+				[event.shiftKey, event.ctrlKey, event.metaKey, event.altKey].every((value) => !value)
+			) {
+				event.preventDefault();
+				listRef.current.children[0].querySelector('button.edit').focus();
+			}
+		}
 	};
 
 	React.useEffect(() => {
-		console.log('Dragged From: ', isReordering && isReordering.draggedFrom);
-		console.log('Dropping Into: ', isReordering && isReordering.draggedTo);
+		console.log('Dragged From: ', reorderMetadata && reorderMetadata.draggedFrom);
+		console.log('Dropping Into: ', reorderMetadata && reorderMetadata.draggedTo);
+		listRef.current.children[reorderMetadata.draggedTo].querySelector('button.edit').focus();
+	}, [reorderMetadata]);
+
+	React.useEffect(() => {
+		if (isReordering) {
+			listRef.current.children[0].querySelector('button.edit').focus();
+		} else {
+			buttonRef.current.focus();
+		}
 	}, [isReordering]);
 
 	React.useEffect(() => {
 		console.log('List updated!');
 	}, [items]);
+
 	return (
-		<div items={items} className={`sortable-list-group`}>
-			<ul className="sortable-list">
+		<div className={`sortable-list-group ${isReordering ? 'active' : ''}`}>
+			<button ref={buttonRef} id="my-edit-list" onClick={toggleIsReordering}>
+				<span className="editingText">Exit edit mode</span>
+				<span className="defaultText">Edit gear list</span>
+			</button>
+			<ul ref={listRef} aria-roledescription="Sortable list" role={isReordering ? "application" : undefined} className="sortable-list">
 				{items.map((item, index) => {
 					return (
 						<ReorderableListItem
@@ -111,7 +157,7 @@ const ReorderableList = () => {
 							onDragStart={onDragStart}
 							onDragOver={onDragOver}
 							onDrop={onDrop}
-							isReordering={isReordering}
+							reorderMetadata={reorderMetadata}
 						/>
 					);
 				})}
